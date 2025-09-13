@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
-import { isString } from 'src/utils/type-guards';
+import { isString } from '../../utils/type-guards.js'; 
 
 @Injectable()
 export class GithubApiService {
