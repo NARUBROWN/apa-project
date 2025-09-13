@@ -51,6 +51,7 @@ export class WebhookService {
 
             this.logger.log(`AI 생성한 리뷰 코멘트: \n${reviewComment}`)
 
+            // AI 리뷰 코멘트를 PR에 게시하는 로직
             await this.octokit.rest.pulls.createReview({
                 owner: owner.login,
                 repo: name,
