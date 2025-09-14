@@ -1,25 +1,19 @@
-import { Body, Injectable, Logger } from '@nestjs/common';
-import { Octokit } from '@octokit/rest';
+import { Injectable, Logger } from '@nestjs/common';
 import { OpenaiService } from '../../ai/openai/openai.service.js';
-import { isString } from '../../utils/type-guards.js';
 import { PullRequestEventPayload } from './webhook.github.type.js';
 import { GithubApiService } from '../github-api/github-api.service.js';
-import { Content } from 'openai/resources/containers/files/content.js';
+import { PromptService } from '../../ai/prompt/prompt.service.js';
 
 
 @Injectable()
 export class WebhookService {
     private readonly logger = new Logger(WebhookService.name);
-    private readonly octokit: Octokit;
 
     constructor(
         private readonly openAiService: OpenaiService,
-        private readonly githubApiService: GithubApiService
-    ) {
-        this.octokit = new Octokit({
-            auth: process.env.GITHUB_ACCESS_TOKEN
-        });
-    }
+        private readonly githubApiService: GithubApiService,
+        private readonly promptService: PromptService
+    ) {}
 
     async handlePullRequestEvent(payload: PullRequestEventPayload) {
         const { number, title, body } = payload.pull_request;
@@ -31,13 +25,15 @@ export class WebhookService {
 
             const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
 
-            const relevantFiles = await this.openAiService.identifyRelevantFiles(
+            const fileIdentificationPrompt = this.promptService.createFileIdentificationPrompt(
                 title,
                 body,
-                allChangedFiles,
+                allChangedFiles, 
                 repositoryTree
             );
 
+            const relevantFiles = await this.openAiService.identifyRelevantFiles(fileIdentificationPrompt);
+            
             const filesToFetch = relevantFiles.slice(0, 2);
             const relatedFilesWithContent = await Promise.all(
                 filesToFetch.map(async filePath => ({
@@ -52,14 +48,16 @@ export class WebhookService {
             const language = pr.base.repo.language ?? 'Unknown Language';
 
             this.logger.log(`PR #${number}의 diff 내용을 가져왔습니다. AI 분석을 시작합니다.`);
-            
-            const reviewComment = await this.openAiService.generateCodeReview(
-                diffText, 
-                language, 
+
+            const codeReviewPrompt = this.promptService.createReviewPrompt(
+                diffText,
+                language,
                 relatedFilesWithContent,
                 title,
                 body
             );
+            
+            const reviewComment = await this.openAiService.generateCodeReview(codeReviewPrompt);
 
             this.logger.log(`AI가 생성한 리뷰 코멘트: \n${reviewComment}`);
 
