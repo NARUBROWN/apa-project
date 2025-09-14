@@ -25,9 +25,15 @@ export class OpenaiService implements AiService {
 
             const rawResponse = response.choices[0].message.content;
 
+            if (response.usage) {
+                this.logger.log(`[FileIdentification] Prompt Tokens: ${response.usage.prompt_tokens}`);
+            }
+
             if (rawResponse) {
                 return JSON.parse(rawResponse) as string[];
             }
+
+            
             return [];
         } catch(e) {
             this.logger.error(`AI 파일 식별 요청 충 오류 발생: ${e.message}`);
@@ -49,6 +55,10 @@ export class OpenaiService implements AiService {
                 model: 'gpt-5-nano',
                 messages: [{ role: 'developer', content: prompt}]
             });
+
+            if (response.usage) {
+                this.logger.log(`[CodeReview] Prompt Tokens: ${response.usage.prompt_tokens}`);
+            }
 
             return response.choices[0].message.content ? response.choices[0].message.content : '결과 없음';
         } catch(e) {
