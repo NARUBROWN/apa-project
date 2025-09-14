@@ -1,15 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
 import { isString } from '../../utils/type-guards.js'; 
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class GithubApiService {
     private readonly logger = new Logger(GithubApiService.name);
     private readonly octokit: Octokit;
 
-    constructor() {
+    constructor(
+        private readonly configService: ConfigService
+    ) {
         this.octokit = new Octokit({
-            auth: process.env.GITHUB_ACCESS_TOKEN
+            auth: this.configService.get<string>('GITHUB_ACCESS_TOKEN')
         });
     }
 

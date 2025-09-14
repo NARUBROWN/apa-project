@@ -1,20 +1,28 @@
 import { Controller, Post, Headers, Body, UnauthorizedException } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { WebhookService } from './webhook.service.js';
-import { PullRequestOpenedEvent, PullRequestReopenedEvent, PullRequestSynchronizeEvent } from '@octokit/webhooks-types';
 import { PullRequestEventPayload } from './webhook.github.type';
+import { ConfigService } from '@nestjs/config';
 
 
 
 @Controller('github/webhook')
 export class WebhookController {
-    
+    private webhookSecret: string;
+
     constructor(
+        private readonly configService: ConfigService,
         private readonly webhookService: WebhookService
     ) {}
 
-    private readonly webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
-
+    onModuleInit() {
+        const secret = this.configService.get<string>('GITHUB_WEBHOOK_SECRET');
+        if (!secret) {
+            throw new Error('GITHUB_WEBHOOK_SECRET 환경 변수가 설정되지 않았습니다.');
+        }
+        this.webhookSecret = secret;
+    }
+    
     @Post()
     handleWebhook(
         @Headers('x-hub-signature-256') signature: string,
