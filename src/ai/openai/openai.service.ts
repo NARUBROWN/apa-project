@@ -1,14 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiService } from '../interfaces/ai-service.interface';
 import OpenAI from 'openai';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class OpenaiService implements AiService {
     private readonly logger = new Logger(OpenaiService.name);
     private readonly openai: OpenAI;
 
-    constructor() {
-        this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    constructor(
+        private readonly configService: ConfigService
+    ) {
+        this.openai = new OpenAI({ apiKey: this.configService.get<string>('OPENAI_API_KEY') });
     }
     async generateCodeReview(diff: string, language: string): Promise<string> {
         try {
