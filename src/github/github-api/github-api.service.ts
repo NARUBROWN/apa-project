@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
 import { isString } from '../../utils/type-guards.js'; 
 import { ConfigService } from '@nestjs/config';
+import { time } from 'console';
 
 @Injectable()
 export class GithubApiService {
@@ -54,6 +55,64 @@ export class GithubApiService {
         } catch(e) {
             this.logger.error(`PR #${pull_number}에 코멘트를 게시하는 중 오류 발생: ${e.message}`);
             throw e;
+        }
+    }
+
+    async getRepositoryTree(owner: string, repo: string, ref: string): Promise<string[]> {
+        try {
+            const response = await this.octokit.rest.git.getTree({
+                owner,
+                repo,
+                tree_sha: ref,
+                recursive: '1'
+            });
+
+            if (response.data.truncated) {
+                this.logger.warn(`리포지토리 트리가 잘렸습니다. ${response.data.tree.length}`);
+            }
+
+            const filePaths = response.data.tree
+                                    .filter(item => item.type === 'blob')
+                                    .map(item => item.path);
+            
+            return filePaths;
+        } catch(e) {
+            this.logger.error(`리포지토리 트리 가져오는 중 오류 발생: ${e.message}`);
+            throw e;
+        }
+    }
+
+    async getFileContent(owner: string, repo: string, path: string): Promise<string> {
+        try {
+            const response = await this.octokit.rest.repos.getContent({
+                owner,
+                repo,
+                path,
+            });
+
+            const content = (response.data as any).content;
+            if (content) {
+                return Buffer.from(content, 'base64').toString('utf-8');
+            }
+            return '';
+        } catch(e) {
+            this.logger.error(`파일 ${path} 내용을 가져오는 중 오류 발생: ${e.message}`);
+            throw e;
+        }
+    }
+
+    async getPullRequestFiles(owner: string, repo: string, pull_number: number): Promise<string[]> {
+        try {
+            const { data: files } = await this.octokit.rest.pulls.listFiles({
+                owner,
+                repo,
+                pull_number
+            });
+
+            return files.map(file => file.filename);
+        } catch(e) {
+            this.logger.error(`PR #${pull_number}의 파일 목록을 가져오는 중 오류 발생: ${e.message}`);
+            throw e; 
         }
     }
 }
