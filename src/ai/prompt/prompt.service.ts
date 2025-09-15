@@ -8,6 +8,27 @@ export class PromptService {
     private readonly MAX_DIFF_LENGTH = 10000;
     private readonly MAX_FILE_CONTENT_LENGTH = 5000;
 
+    createFileIdentificationPrompt(prTitle: string, prBody: string | null, changedFiles: string[], repositoryFilePaths: string[]): string {
+        const changedFilesList = changedFiles.map(file => ` - ${file}`).join('\n');
+        const repoStructure = repositoryFilePaths.map(file => ` - ${file}`).join('\n');
+        
+        const result = `
+            당신은 소프트웨어 프로젝트의 구조를 완벽하게 이해하는 전문가입니다.
+            다음은 Pull Request에 대한 정보와 리포지토리의 전체 파일 구조입니다.
+            PR 제목: ${prTitle}
+            PR 내용: ${prBody}
+            PR에서 변경된 파일 목록:
+            ${changedFilesList}
+            리포지토리 전체 파일 구조:
+            ${repoStructure}
+            위 정보를 바탕으로 이 Pull Request의 코드 변경을 정확히 리뷰하기 위해 **반드시 열어봐야 할 핵심 소스코드 파일들의 경로**를 최대 3개까지만 JSON 배열 형식으로 반환해 주세요. 응답은 오직 파일 경로 JSON 배열만 포함해야 합니다.
+            예시: ["src/app.controller.ts", "src/services/api.service.ts"]
+        `;
+        
+        this.logger.log(`[createFileIdentificationPrompt] ${result}`);
+        return result;
+    }
+
     createReviewPrompt(
         diff: string,
         language: string,
@@ -67,30 +88,6 @@ export class PromptService {
 
         this.logger.log(`[createReviewPrompt] ${result}`);
 
-        return result;
-    }
-
-    createKeywordExtractionPrompt(prTitle: string, prBody: string | null, changedFiles: string[], diff: string): string {
-        const changedFilesList = changedFiles.map(file => ` - ${file}`).join('\n');
-        const truncatedDiff = diff.length > this.MAX_DIFF_LENGTH
-                                    ? diff.substring(0, this.MAX_DIFF_LENGTH) + '\n... [Diff content truncated]' :
-                                    diff;
-
-        const result = `
-            당신은 Pull Request의 내용을 분석하여 핵심 키워드를 추출하는 전문가입니다.
-            다음은 Pull Request에 대한 정보입니다.
-            PR 제목: ${prTitle}
-            PR 내용: ${prBody}
-            변경 파일 목록:
-            ${changedFilesList}
-            코드 변경 사항 (Diff): ${truncatedDiff}
-
-            위 정보를 바탕으로 이 Pull Request의 변경 내용을 가장 잘 나타내는 기술 용어, 파일명, 핵심 개념 등의 키워드를 정확히 20개 추출해주세요.
-            응답은 오직 키워드 문자열 배열(string[]) 형태의 JSON만 포함해야 합니다.
-            예시: ["authentication", "user-service", "database", "migration", "refactor"]
-        `;
-
-        this.logger.log(`[createKeywordExtractionPrompt] ${result}`);
         return result;
     }
 }
