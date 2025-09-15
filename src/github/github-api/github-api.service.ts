@@ -3,6 +3,7 @@ import { Octokit } from '@octokit/rest';
 import { isString } from '../../utils/type-guards.js'; 
 import { ConfigService } from '@nestjs/config';
 import { time } from 'console';
+import Fuse from 'fuse.js';
 
 @Injectable()
 export class GithubApiService {
@@ -114,5 +115,32 @@ export class GithubApiService {
             this.logger.error(`PR #${pull_number}의 파일 목록을 가져오는 중 오류 발생: ${e.message}`);
             throw e; 
         }
+    }
+
+    fuzzySearchFiles(allFiles: string[], keywords: string[]): string[] {
+        if (keywords.length === 0) {
+            return [];
+        }
+
+        const options = {
+            includeScore: true,
+            keys: ['path'],
+            threshold: 0.6,
+        }
+
+        const fuse = new Fuse(allFiles.map(path => ({ path })), options);
+        
+        let relevantFiles = new Set<string>();
+
+        keywords.forEach(keyword => {
+            const result = fuse.search(keyword);
+            result.forEach(result => {
+                if (result.score && result.score < 0.6) {
+                    relevantFiles.add(result.item.path);
+                }
+            });
+        });
+
+        return Array.from(relevantFiles).slice(0, 3);
     }
 }
