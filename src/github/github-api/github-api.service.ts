@@ -97,6 +97,10 @@ export class GithubApiService {
             }
             return '';
         } catch(e) {
+            if (e.status === 404 && path.endsWith('.gitkeep')) {
+                this.logger.warn(`파일 내용을 가져오지 못했지만, 빈 파일이므로 무시합니다: ${path}`);
+                return '';
+            }
             this.logger.error(`파일 ${path} 내용을 가져오는 중 오류 발생: ${e.message}`);
             throw e;
         }
