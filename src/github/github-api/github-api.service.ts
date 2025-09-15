@@ -145,6 +145,8 @@ export class GithubApiService {
             });
         });
 
+        this.logger.log(`relevantFiles: ${relevantFiles} \n allFiles: ${allFiles}`);
+
         return Array.from(relevantFiles).slice(0, 3);
     }
 }
