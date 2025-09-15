@@ -3,6 +3,7 @@ import { OpenaiService } from '../../ai/openai/openai.service.js';
 import { PullRequestEventPayload } from './webhook.github.type.js';
 import { GithubApiService } from '../github-api/github-api.service.js';
 import { PromptService } from '../../ai/prompt/prompt.service.js';
+import path from 'path';
 
 const IGNORED_FILE_EXTENSIONS = [
   '.svg', '.png', '.jpeg', '.jpg', '.gif', '.bmp', '.ico',
@@ -32,7 +33,7 @@ export class WebhookService {
             const diffText = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
 
             const changedCodeFiles = allChangedFiles.filter(file => {
-                const extension = file.substring(file.lastIndexOf('.')).toLocaleLowerCase();
+                const extension = path.extname(file).toLocaleLowerCase();
                 return !IGNORED_FILE_EXTENSIONS.includes(extension);
             });
 
@@ -47,7 +48,7 @@ export class WebhookService {
             this.logger.log(`AI가 추출한 키워드: ${keywords.join(', ')}`);
 
             const codeFilesFromRepository = repositoryTree.filter(file => {
-                const extension = file.substring(file.lastIndexOf('.')).toLocaleLowerCase();
+                const extension = path.extname(file).toLocaleLowerCase();
                 return !IGNORED_FILE_EXTENSIONS.includes(extension);
             });
 
