@@ -46,9 +46,14 @@ export class WebhookService {
             const keywords = await this.openAiService.extractKeywords(keywordExtractionPrompt);
             this.logger.log(`AI가 추출한 키워드: ${keywords.join(', ')}`);
 
-            const relevantFiles = this.githubApiService.fuzzySearchFiles(repositoryTree, keywords);
+            const codeFilesFromRepository = repositoryTree.filter(file => {
+                const extension = file.substring(file.lastIndexOf('.')).toLocaleLowerCase();
+                return !IGNORED_FILE_EXTENSIONS.includes(extension);
+            });
 
-            const filesToFetch = relevantFiles.slice(0, 2);
+            const relevantFiles = this.githubApiService.fuzzySearchFiles(codeFilesFromRepository, keywords);
+
+            const filesToFetch = relevantFiles.slice(0, 5);
             const relatedFilesWithContent = await Promise.all(
                 filesToFetch.map(async filePath => ({
                     filePath,
