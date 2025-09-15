@@ -58,7 +58,7 @@ export class WebhookService {
             
             const relatedFilesWithContent = (await Promise.all(
                 filesToFetch.map(async filePath => {
-                    const content = await this.githubApiService.getFileContent(owner.login, name, filePath);
+                    const content = await this.githubApiService.getFileContent(owner.login, name, filePath, headSha);
                     if (content !== null) {
                         return { filePath, content };
                     }
