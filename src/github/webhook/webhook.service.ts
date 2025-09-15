@@ -4,6 +4,12 @@ import { PullRequestEventPayload } from './webhook.github.type.js';
 import { GithubApiService } from '../github-api/github-api.service.js';
 import { PromptService } from '../../ai/prompt/prompt.service.js';
 
+const IGNORED_FILE_EXTENSIONS = [
+  '.svg', '.png', '.jpeg', '.jpg', '.gif', '.bmp', '.ico',
+  '.mp4', '.mov', '.avi', '.webm',
+  '.lock',
+];
+
 
 @Injectable()
 export class WebhookService {
@@ -25,11 +31,16 @@ export class WebhookService {
             const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
             const diffText = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
 
+            const codeFiles = allChangedFiles.filter(file => {
+                const extension = file.substring(file.lastIndexOf('.')).toLocaleLowerCase();
+                return !IGNORED_FILE_EXTENSIONS.includes(extension);
+            });
+
             this.logger.log(`PR #${number}의 키워드 추출을 AI에게 요청합니다.`);
             const keywordExtractionPrompt = this.promptService.createKeywordExtractionPrompt(
                 title,
                 body,
-                allChangedFiles,
+                codeFiles,
                 diffText
             );
             const keywords = await this.openAiService.extractKeywords(keywordExtractionPrompt);
