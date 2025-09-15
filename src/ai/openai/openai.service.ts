@@ -15,7 +15,8 @@ export class OpenaiService implements AiService {
         this.openai = new OpenAI({ apiKey: this.configService.get<string>('OPENAI_API_KEY') });
     }
 
-    async extractKeywords(prompt: string): Promise<string[]> {
+    async identifyRelevantFiles(prompt: string): Promise<string[]> {
+
         try {
             const response = await this.openai.chat.completions.create({
                 model: 'gpt-5-nano',
@@ -25,16 +26,17 @@ export class OpenaiService implements AiService {
             const rawResponse = response.choices[0].message.content;
 
             if (response.usage) {
-                this.logger.log(`[KeywordExtraction] Prompt Tokens: ${response.usage.prompt_tokens}`);
+                this.logger.log(`[FileIdentification] Prompt Tokens: ${response.usage.prompt_tokens}`);
             }
 
             if (rawResponse) {
                 return JSON.parse(rawResponse) as string[];
             }
-            return [];
+
             
+            return [];
         } catch(e) {
-            this.logger.error(`AI 키워드 추출 요청 중 오류 발생: ${e.message}`);
+            this.logger.error(`AI 파일 식별 요청 충 오류 발생: ${e.message}`);
             return [];
         }
     }
@@ -56,7 +58,5 @@ export class OpenaiService implements AiService {
             throw e;
         }
     }
-
-
     
 }

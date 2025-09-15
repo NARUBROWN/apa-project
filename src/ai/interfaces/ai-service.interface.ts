@@ -1,4 +1,4 @@
 export interface AiService {
+    identifyRelevantFiles(prompt: string): Promise<string[]>;
     generateCodeReview(prompt: string): Promise<string>;
-    extractKeywords(prompt: string): Promise<string[]>;
 }

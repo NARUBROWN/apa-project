@@ -22,21 +22,18 @@ export class WebhookService {
 
         try {
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
-            const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
-            const diffText = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
 
-            this.logger.log(`PR #${number}의 키워드 추출을 AI에게 요청합니다.`);
-            const keywordExtractionPrompt = this.promptService.createKeywordExtractionPrompt(
+            const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
+
+            const fileIdentificationPrompt = this.promptService.createFileIdentificationPrompt(
                 title,
                 body,
-                allChangedFiles,
-                diffText
+                allChangedFiles, 
+                repositoryTree
             );
-            const keywords = await this.openAiService.extractKeywords(keywordExtractionPrompt);
-            this.logger.log(`AI가 추출한 키워드: ${keywords.join(', ')}`);
 
-            const relevantFiles = this.githubApiService.fuzzySearchFiles(repositoryTree, keywords);
-
+            const relevantFiles = await this.openAiService.identifyRelevantFiles(fileIdentificationPrompt);
+            
             const filesToFetch = relevantFiles.slice(0, 2);
             const relatedFilesWithContent = await Promise.all(
                 filesToFetch.map(async filePath => ({
@@ -44,6 +41,8 @@ export class WebhookService {
                     content: await this.githubApiService.getFileContent(owner.login, name, filePath)
                 }))
             );
+
+            const diffText = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
 
             const pr = payload.pull_request;
             const language = pr.base.repo.language ?? 'Unknown Language';
@@ -64,7 +63,7 @@ export class WebhookService {
 
             await this.githubApiService.createPullRequestReview(owner.login, name, number, reviewComment);
         } catch(e) {
-            this.logger.error(`PR #${number} 처리 중 오류 발생: ${e.message}`);
+            this.logger.error(`PR #${number}의 diff를 가져오는 중 오류 발생: ${e.message}`);
         }
     }
 }
