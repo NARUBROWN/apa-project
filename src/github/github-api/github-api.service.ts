@@ -83,7 +83,7 @@ export class GithubApiService {
         }
     }
 
-    async getFileContent(owner: string, repo: string, path: string): Promise<string> {
+    async getFileContent(owner: string, repo: string, path: string): Promise<string | null> {
         try {
             const response = await this.octokit.rest.repos.getContent({
                 owner,
@@ -97,9 +97,9 @@ export class GithubApiService {
             }
             return '';
         } catch(e) {
-            if (e.status === 404 && path.endsWith('.gitkeep')) {
-                this.logger.warn(`파일 내용을 가져오지 못했지만, 빈 파일이므로 무시합니다: ${path}`);
-                return '';
+            if (e.status === 404) {
+                this.logger.warn(`파일 내용을 가져오지 못했습니다. 파일이 삭제되었거나 경로가 올바르지 않습니다: ${path}`);
+                return null;
             }
             this.logger.error(`파일 ${path} 내용을 가져오는 중 오류 발생: ${e.message}`);
             throw e;

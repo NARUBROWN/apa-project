@@ -31,7 +31,7 @@ export class WebhookService {
             const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
             const diffText = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
 
-            const codeFiles = allChangedFiles.filter(file => {
+            const changedCodeFiles = allChangedFiles.filter(file => {
                 const extension = file.substring(file.lastIndexOf('.')).toLocaleLowerCase();
                 return !IGNORED_FILE_EXTENSIONS.includes(extension);
             });
@@ -40,7 +40,7 @@ export class WebhookService {
             const keywordExtractionPrompt = this.promptService.createKeywordExtractionPrompt(
                 title,
                 body,
-                codeFiles,
+                changedCodeFiles,
                 diffText
             );
             const keywords = await this.openAiService.extractKeywords(keywordExtractionPrompt);
@@ -54,12 +54,16 @@ export class WebhookService {
             const relevantFiles = this.githubApiService.fuzzySearchFiles(codeFilesFromRepository, keywords);
 
             const filesToFetch = relevantFiles.slice(0, 5);
-            const relatedFilesWithContent = await Promise.all(
-                filesToFetch.map(async filePath => ({
-                    filePath,
-                    content: await this.githubApiService.getFileContent(owner.login, name, filePath)
-                }))
-            );
+            
+            const relatedFilesWithContent = (await Promise.all(
+                filesToFetch.map(async filePath => {
+                    const content = await this.githubApiService.getFileContent(owner.login, name, filePath);
+                    if (content !== null) {
+                        return { filePath, content };
+                    }
+                    return null;
+                })
+            )).filter(file => file !== null);
 
             const pr = payload.pull_request;
             const language = pr.base.repo.language ?? 'Unknown Language';
