@@ -32,7 +32,7 @@ export class OpenaiService implements AiService {
                 return JSON.parse(rawResponse) as string[];
             }
             return [];
-            
+
         } catch(e) {
             this.logger.error(`AI 키워드 추출 요청 중 오류 발생: ${e.message}`);
             return [];
@@ -42,7 +42,7 @@ export class OpenaiService implements AiService {
     async generateCodeReview(prompt: string): Promise<string> {
         try {
             const response = await this.openai.chat.completions.create({
-                model: 'gpt-5-nano',
+                model: 'gpt-4o-mini',
                 messages: [{ role: 'developer', content: prompt}]
             });
 
