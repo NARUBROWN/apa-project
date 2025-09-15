@@ -83,12 +83,13 @@ export class GithubApiService {
         }
     }
 
-    async getFileContent(owner: string, repo: string, path: string): Promise<string | null> {
+    async getFileContent(owner: string, repo: string, path: string, ref: string): Promise<string | null> {
         try {
             const response = await this.octokit.rest.repos.getContent({
                 owner,
                 repo,
                 path,
+                ref
             });
 
             const content = (response.data as any).content;
