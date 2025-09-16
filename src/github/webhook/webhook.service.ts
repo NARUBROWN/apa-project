@@ -4,6 +4,7 @@ import { PullRequestEventPayload } from './webhook.github.type.js';
 import { GithubApiService } from '../github-api/github-api.service.js';
 import { PromptService } from '../../ai/prompt/prompt.service.js';
 import path from 'path';
+import parseDiff from 'parse-diff';
 
 const IGNORED_FILE_EXTENSIONS = [
   '.svg', '.png', '.jpeg', '.jpg', '.gif', '.bmp', '.ico',
@@ -30,7 +31,10 @@ export class WebhookService {
         try {
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
             const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
+
             const diffText = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
+
+            const filteredDiffText = this.filterDiff(diffText, IGNORED_FILE_EXTENSIONS);
 
             const changedCodeFiles = allChangedFiles.filter(file => {
                 const extension = path.extname(file).toLocaleLowerCase();
@@ -42,7 +46,7 @@ export class WebhookService {
                 title,
                 body,
                 changedCodeFiles,
-                diffText
+                filteredDiffText
             );
             const keywords = await this.openAiService.extractKeywords(keywordExtractionPrompt);
             this.logger.log(`AI가 추출한 키워드: ${keywords.join(', ')}`);
@@ -72,7 +76,7 @@ export class WebhookService {
             this.logger.log(`PR #${number}의 diff 내용을 가져왔습니다. AI 분석을 시작합니다.`);
 
             const codeReviewPrompt = this.promptService.createReviewPrompt(
-                diffText,
+                filteredDiffText,
                 language,
                 relatedFilesWithContent,
                 title,
@@ -87,5 +91,29 @@ export class WebhookService {
         } catch(e) {
             this.logger.error(`PR #${number} 처리 중 오류 발생: ${e.message}`);
         }
+    }
+
+    private filterDiff(diff: string, ignoredExtensions: string[]): string {
+        const files = parseDiff(diff);
+        const filteredDiffs: string[] = [];
+
+        for (const file of files) {
+            if (!file.to) {
+                continue;
+            }
+
+            const extension = path.extname(file.to).toLocaleLowerCase();
+
+            if (!ignoredExtensions.includes(extension)) {
+                const header = `diff --git a/${file.from} b/${file.to}\n`;
+                const chunks = file.chunks.map(chunk => {
+                    const chunkHeader = `@@ -${chunk.oldStart},${chunk.oldLines} +${chunk.newStart},${chunk.newLines} @@\n`;
+                    const changes = chunk.changes.map(change => `${change.content}`).join('\n');
+                    return chunkHeader + changes;
+                }).join('\n');
+                filteredDiffs.push(header + chunks);
+            }
+        }
+        return filteredDiffs.join('\n');
     }
 }

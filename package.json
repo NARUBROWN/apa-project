@@ -28,6 +28,7 @@
     "@octokit/webhooks-types": "^7.6.1",
     "fuse.js": "^7.1.0",
     "openai": "^5.20.2",
+    "parse-diff": "^0.11.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
