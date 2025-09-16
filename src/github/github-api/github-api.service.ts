@@ -18,6 +18,46 @@ export class GithubApiService {
         });
     }
 
+    async getCommitDiff(owner: string, repo: string, commit_sha: string): Promise<string> {
+        try {
+            const response = await this.octokit.rest.repos.getCommit({
+                owner,
+                repo,
+                ref: commit_sha,
+                headers: {
+                    accept: 'application/vnd.github.v3.diff'
+                },
+                mediaType: {
+                    format: 'diff'
+                }
+            });
+
+            if (!isString(response.data)) {
+                this.logger.error(`커밋 ${commit_sha}의 diff를 가져왔지만 예상한 타입이 아닙니다.`);
+                throw new Error('Github API에서 예상하지 못한 데이터를 가져왔습니다.');
+            }
+            return response.data;
+        } catch(e) {
+            this.logger.error(`커밋 ${commit_sha}의 diff를 가져오는 중 오류 발생: ${e.message}`);
+            throw e;
+        }
+    }
+
+    async getPullRequestCommits(owner: string, repo: string, pull_number: number): Promise<string[]> {
+        try {
+            const { data: commits } = await this.octokit.rest.pulls.listCommits({
+                owner,
+                repo,
+                pull_number
+            });
+
+            return commits.map(commit => commit.sha);
+        } catch(e) {
+            this.logger.error(`PR #${pull_number}의 커밋 목록을 가져오는 중 오류 발생: ${e.message}`);
+            throw e;
+        }
+    }
+
     async getPullRequestDiff(owner: string, repo: string, pull_number: number): Promise<string> {
         try {
             const response = await this.octokit.rest.pulls.get({

@@ -29,12 +29,19 @@ export class WebhookService {
         const headSha = payload.pull_request.head.sha;
 
         try {
+            const commits = await this.githubApiService.getPullRequestCommits(owner.login, name, number);
+            this.logger.log(`PR #${number}에서 총 ${commits.length}개의 커밋을 발견했습니다.`);
+
+            let allDiffs = '';
+            for (const commitSha of commits) {
+                const diff = await this.githubApiService.getCommitDiff(owner.login, name, commitSha);
+                const filteredDiffText = this.filterDiff(diff, IGNORED_FILE_EXTENSIONS);
+                allDiffs += filteredDiffText + '\n';
+            }
+
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
             const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
-
-            const diffText = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
-
-            const filteredDiffText = this.filterDiff(diffText, IGNORED_FILE_EXTENSIONS);
+            
 
             const changedCodeFiles = allChangedFiles.filter(file => {
                 const extension = path.extname(file).toLocaleLowerCase();
@@ -46,7 +53,7 @@ export class WebhookService {
                 title,
                 body,
                 changedCodeFiles,
-                filteredDiffText
+                allDiffs
             );
             const keywords = await this.openAiService.extractKeywords(keywordExtractionPrompt);
             this.logger.log(`AI가 추출한 키워드: ${keywords.join(', ')}`);
@@ -76,7 +83,7 @@ export class WebhookService {
             this.logger.log(`PR #${number}의 diff 내용을 가져왔습니다. AI 분석을 시작합니다.`);
 
             const codeReviewPrompt = this.promptService.createReviewPrompt(
-                filteredDiffText,
+                allDiffs,
                 language,
                 relatedFilesWithContent,
                 title,
@@ -98,7 +105,7 @@ export class WebhookService {
         const filteredDiffs: string[] = [];
 
         for (const file of files) {
-            if (!file.to) {
+            if (typeof file.to !== 'string') {
                 continue;
             }
 
