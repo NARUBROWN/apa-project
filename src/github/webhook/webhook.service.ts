@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OpenaiService } from '../../ai/openai/openai.service.js';
 import { PullRequestEventPayload } from './webhook.github.type.js';
 import { GithubApiService } from '../github-api/github-api.service.js';
-import { PromptService } from '../../ai/prompt/prompt.service.js';
 import path from 'path';
 import parseDiff from 'parse-diff';
+import { CodeReviewAgentService } from '../../ai/code-review-agent/code-review-agent.service.js';
+import { PromptService } from '../../ai/prompt/prompt.service.js';
 
 const IGNORED_FILE_EXTENSIONS = [
   '.svg', '.png', '.jpeg', '.jpg', '.gif', '.bmp', '.ico',
@@ -18,7 +18,7 @@ export class WebhookService {
     private readonly logger = new Logger(WebhookService.name);
 
     constructor(
-        private readonly openAiService: OpenaiService,
+        private readonly codeReviewAgentService: CodeReviewAgentService,
         private readonly githubApiService: GithubApiService,
         private readonly promptService: PromptService
     ) {}
@@ -32,65 +32,34 @@ export class WebhookService {
             const commits = await this.githubApiService.getPullRequestCommits(owner.login, name, number);
             this.logger.log(`PR #${number}에서 총 ${commits.length}개의 커밋을 발견했습니다.`);
 
-            let allDiffs = '';
+            let filteredAllDiffs = '';
             for (const commitSha of commits) {
                 const diff = await this.githubApiService.getCommitDiff(owner.login, name, commitSha);
                 const filteredDiffText = this.filterDiff(diff, IGNORED_FILE_EXTENSIONS);
-                allDiffs += filteredDiffText + '\n';
+                filteredAllDiffs += filteredDiffText + '\n';
             }
 
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
-            const repositoryTree = await this.githubApiService.getRepositoryTree(owner.login, name, headSha);
             
-
-            const changedCodeFiles = allChangedFiles.filter(file => {
+            const filteredAllChangedFiles = allChangedFiles.filter(file => {
                 const extension = path.extname(file).toLocaleLowerCase();
                 return !IGNORED_FILE_EXTENSIONS.includes(extension);
             });
-
-            this.logger.log(`PR #${number}의 키워드 추출을 AI에게 요청합니다.`);
-            const keywordExtractionPrompt = this.promptService.createKeywordExtractionPrompt(
-                title,
-                body,
-                changedCodeFiles,
-                allDiffs
-            );
-            const keywords = await this.openAiService.extractKeywords(keywordExtractionPrompt);
-            this.logger.log(`AI가 추출한 키워드: ${keywords.join(', ')}`);
-
-            const codeFilesFromRepository = repositoryTree.filter(file => {
-                const extension = path.extname(file).toLocaleLowerCase();
-                return !IGNORED_FILE_EXTENSIONS.includes(extension);
-            });
-
-            const relevantFiles = this.githubApiService.fuzzySearchFiles(codeFilesFromRepository, keywords);
-
-            const filesToFetch = relevantFiles.slice(0, 5);
-            
-            const relatedFilesWithContent = (await Promise.all(
-                filesToFetch.map(async filePath => {
-                    const content = await this.githubApiService.getFileContent(owner.login, name, filePath, headSha);
-                    if (content !== null) {
-                        return { filePath, content };
-                    }
-                    return null;
-                })
-            )).filter(file => file !== null);
 
             const pr = payload.pull_request;
             const language = pr.base.repo.language ?? 'Unknown Language';
 
-            this.logger.log(`PR #${number}의 diff 내용을 가져왔습니다. AI 분석을 시작합니다.`);
-
-            const codeReviewPrompt = this.promptService.createReviewPrompt(
-                allDiffs,
-                language,
-                relatedFilesWithContent,
+            const reviewComment = await this.codeReviewAgentService.performCodeReview(
+                owner.login,
+                name,
+                number,
                 title,
-                body
+                body,
+                language,
+                filteredAllDiffs,
+                filteredAllChangedFiles,
+                headSha
             );
-            
-            const reviewComment = await this.openAiService.generateCodeReview(codeReviewPrompt);
 
             this.logger.log(`AI가 생성한 리뷰 코멘트: \n${reviewComment}`);
 

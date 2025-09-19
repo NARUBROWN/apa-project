@@ -12,26 +12,19 @@ export class PromptService {
     
     private readonly logger = new Logger(PromptService.name);
 
-    private readonly MAX_DIFF_LENGTH = 10000;
-    private readonly MAX_FILE_CONTENT_LENGTH = 5000;
+    private readonly MAX_DIFF_LENGTH = 50000;
+    private readonly MAX_FILE_CONTENT_LENGTH = 10000;
 
     private readonly compiledTemplates = new Map<string, handlebars.TemplateDelegate>();
 
     constructor() {
         this.loadTemplates();
     }
-    
-    createReviewPrompt(
-        diff: string,
-        language: string,
-        relatedFilesWithContent: Array<{ filePath: string; content: string }>,
-        prTitle: string,
-        prBody: string | null
-    ): string {
 
-        const truncatedDiff = diff.length > this.MAX_DIFF_LENGTH
-                                    ? diff.substring(0, this.MAX_DIFF_LENGTH) + '\n... [Diff content truncated]' :
-                                    diff;
+    createFinalReviewPrompt(prTitle: string, prBody: string | null, analysisResult: string, language: string, allDiffs: string, relatedFilesWithContent: { filePath: string; content: string; }[]): string {
+       const truncatedDiff = allDiffs.length > this.MAX_DIFF_LENGTH
+                                    ? allDiffs.substring(0, this.MAX_DIFF_LENGTH) + '\n... [Diff content truncated]' :
+                                    allDiffs;
 
         const truncatedRelatedFiles = relatedFilesWithContent.map(file => ({
             ...file,
@@ -42,26 +35,48 @@ export class PromptService {
 
         const relatedFilesContent = truncatedRelatedFiles
         .map(file => {
-            return `--- File: ${file.filePath} ---
+            return `--- 파일: ${file.filePath} ---
             ${file.content}
             `;
         })
         .join('\n');
 
 
-        const templates = this.compiledTemplates.get('review-prompt');
-        if (!templates) throw new InternalServerErrorException('템플릿을 불러오는데 실패했습니다.');
+        const template = this.compiledTemplates.get('final-review-prompt');
+        if (!template) throw new InternalServerErrorException('final-review-prompt 템플릿을 불러오는데 실패했습니다.');
 
         const data = {
             prTitle,
             prBody: prBody || '',
-            relatedFilesContent,
+            analysisResult,
             language,
+            truncatedDiff,
+            relatedFilesContent
+        };
+
+        const result = template(data);
+        this.logger.log(`[createFinalReviewPrompt] 프롬프트 생성 완료`);
+        return result;
+    }
+    
+    createAnalysisPrompt(prTitle: string, prBody: string | null, allChangedFiles: string[], allDiffs: string): string {
+        const changedFilesList = allChangedFiles.map(file => ` - ${file}`).join('\n');
+        const truncatedDiff = allDiffs.length > this.MAX_DIFF_LENGTH
+                                    ? allDiffs.substring(0, this.MAX_DIFF_LENGTH) + '\n... [Diff content truncated]' :
+                                    allDiffs;
+
+        const template = this.compiledTemplates.get('analysis-prompt');
+        if (!template) throw new InternalServerErrorException('analysis-prompt 템플릿을 불러오는데 실패했습니다.');
+
+        const data = {
+            prTitle,
+            prBody: prBody || '',
+            changedFilesList,
             truncatedDiff
         };
 
-        const result = templates(data);
-        this.logger.log(`[createReviewPrompt] ${result}`);
+        const result = template(data);
+        this.logger.log(`[createAnalysisPrompt] 프롬프트 생성 완료`);
         return result;
     }
 

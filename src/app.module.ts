@@ -9,5 +9,6 @@ import { WebhookModule } from './github/webhook/webhook.module.js';
     }),
     WebhookModule
   ],
+  providers: [],
 })
 export class AppModule {}

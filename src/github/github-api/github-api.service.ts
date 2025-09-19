@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
 import { isString } from '../../utils/type-guards.js'; 
 import { ConfigService } from '@nestjs/config';
-import { time } from 'console';
 import Fuse from 'fuse.js';
 
 @Injectable()

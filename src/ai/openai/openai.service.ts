@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiService } from '../interfaces/ai-service.interface.js';
+import { AIService } from '../interfaces/ai-service.interface.js';
 import OpenAI from 'openai';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class OpenaiService implements AiService {
+export class OpenAIService implements AIService {
 
-    private readonly logger = new Logger(OpenaiService.name);
+    private readonly logger = new Logger(OpenAIService.name);
     private readonly openai: OpenAI;
 
     constructor(
@@ -48,6 +48,24 @@ export class OpenaiService implements AiService {
 
             if (response.usage) {
                 this.logger.log(`[CodeReview] Prompt Tokens: ${response.usage.prompt_tokens}`);
+            }
+
+            return response.choices[0].message.content ? response.choices[0].message.content : '결과 없음';
+        } catch(e) {
+            this.logger.error(`OpenAI API 호출 중 오류 발생: ${e.message}`);
+            throw e;
+        }
+    }
+
+    async generateAnalysis(prompt: string): Promise<string> {
+        try {
+            const response = await this.openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'developer', content: prompt}]
+            });
+
+            if (response.usage) {
+                this.logger.log(`[Analysis] Prompt Tokens: ${response.usage.prompt_tokens}`);
             }
 
             return response.choices[0].message.content ? response.choices[0].message.content : '결과 없음';
