@@ -1,9 +1,9 @@
 import { Controller, Post, Headers, Body, UnauthorizedException } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { WebhookService } from './webhook.service.js';
-import { PullRequestEventPayload } from './webhook.github.type';
+import { PullRequestEventPayload, WebhookPayload } from './webhook.github.type';
 import { ConfigService } from '@nestjs/config';
-
+import { IssueCommentCreatedEvent } from '@octokit/webhooks-types';
 
 
 @Controller('github/webhook')
@@ -27,19 +27,26 @@ export class WebhookController {
     handleWebhook(
         @Headers('x-hub-signature-256') signature: string,
         @Headers('x-github-event') event: string,
-        @Body() payload: PullRequestEventPayload
+        @Body() payload: WebhookPayload
     ) {
         if (!this.verifySignature(signature, payload)) {
             throw new UnauthorizedException('유효하지 않은 시그니처');
         }
 
         if (event == 'pull_request') {
-            const { action } = payload;
+            const { action } = payload as PullRequestEventPayload;
 
             if (action === 'opened' || action === 'reopened' || action === 'synchronize') {
-                this.webhookService.handlePullRequestEvent(payload);
+                this.webhookService.handlePullRequestEvent(payload as PullRequestEventPayload);
+            }
+        } else if (event === 'issue_comment') {
+            const { action, issue, comment } = payload as IssueCommentCreatedEvent;
+            
+            if (action === 'created' && issue.pull_request && comment.body.includes('@APA-PR-Analyst')) {
+                this.webhookService.handleCommentEvent(payload as IssueCommentCreatedEvent);
             }
         }
+        
 
         return { success: true };
     }

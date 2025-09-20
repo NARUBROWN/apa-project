@@ -14,6 +14,23 @@ export class OpenAIService implements AIService {
     ) {
         this.openai = new OpenAI({ apiKey: this.configService.get<string>('OPENAI_API_KEY') });
     }
+    async generateConversationalResponse(prompt: string): Promise<string> {
+        try {
+            const response = await this.openai.chat.completions.create({
+                model: 'gpt-4o-mini', 
+                messages: [{ role: 'developer', content: prompt }]
+            });
+
+            if (response.usage) {
+                this.logger.log(`[ConversationalResponse] Prompt Tokens: ${response.usage.prompt_tokens}`);
+            }
+
+            return response.choices[0].message.content || '답변을 생성할 수 없습니다.';
+        } catch(e) {
+            this.logger.error(`OpenAI API 호출 중 오류 발생: ${e.message}`);
+            throw e;
+        }
+    }
 
     async extractKeywords(prompt: string): Promise<string[]> {
         try {
