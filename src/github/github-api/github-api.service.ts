@@ -3,6 +3,7 @@ import { Octokit } from '@octokit/rest';
 import { isString } from '../../utils/type-guards.js'; 
 import { ConfigService } from '@nestjs/config';
 import Fuse from 'fuse.js';
+import { PullRequestReviewComment } from '@octokit/webhooks-types';
 
 @Injectable()
 export class GithubApiService {
@@ -15,6 +16,35 @@ export class GithubApiService {
         this.octokit = new Octokit({
             auth: this.configService.get<string>('GITHUB_ACCESS_TOKEN')
         });
+    }
+
+    async createPullRequestReviewComment(owner: string, repo: string, pull_number: number, comment: any) {
+        try {
+            await this.octokit.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pull_number,
+                body: comment,
+            });
+            this.logger.log(`PR #${pull_number}에 댓글이 성공적으로 게시되었습니다.`);
+        } catch(e) {
+            this.logger.error(`PR #${pull_number}에 댓글을 게시하는 중 오류 발생: ${e.message}`);
+            throw e;
+        }
+    }
+
+    async getPullRequestReviewComments(owner: string, repo: string, pull_number: number) {
+        try {
+            const { data: comments } = await this.octokit.rest.pulls.listReviewComments({
+                owner,
+                repo,
+                pull_number,
+            });
+            return comments.filter(comment => comment.user?.login === 'APA-PR-Analyst') as PullRequestReviewComment[];
+        } catch(e) {
+            this.logger.error(`PR #${pull_number}의 리뷰 코멘트를 가져오는 중 오류 발생`);
+            throw e;
+        }
     }
 
     async getCommitDiff(owner: string, repo: string, commit_sha: string): Promise<string> {

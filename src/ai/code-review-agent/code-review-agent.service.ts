@@ -3,6 +3,8 @@ import { PromptService } from '../prompt/prompt.service.js';
 import { GithubApiService } from '../../github/github-api/github-api.service.js';
 import { AIService } from '../interfaces/ai-service.interface.js';
 import { AI_SERVICE } from '../interfaces/ai-service.token.js';
+import { components } from '@octokit/openapi-types';
+import { PullRequestReviewComment } from '@octokit/webhooks-types';
 
 @Injectable()
 export class CodeReviewAgentService {
@@ -69,5 +71,23 @@ export class CodeReviewAgentService {
         this.logger.log(`최종 리뷰 코멘트:\n${finalReviewComment}`);
 
         return finalReviewComment;
+    }
+
+    async respondToComment(owner: string, repo: string, pull_number: number, prTitle: string, prBody: string | null, userComment: string, allDiffs: string, existingReviewComments: PullRequestReviewComment[]) {
+        this.logger.log(`PR #${pull_number}에 대한 개발자의 댓글에 답변을 시작합니다.`);
+
+        const conversationalPrompt = this.promptService.createConversationalPrompt(
+            prTitle,
+            prBody,
+            userComment,
+            allDiffs,
+            existingReviewComments
+        );
+
+        const aiResponse = await this.aiService.generateConversationalResponse(conversationalPrompt);
+
+        this.logger.log(`AI가 생성한 대화형 답변: \n ${aiResponse}`);
+        
+        return aiResponse
     }
 }

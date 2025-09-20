@@ -5,6 +5,7 @@ import path from 'path';
 import parseDiff from 'parse-diff';
 import { CodeReviewAgentService } from '../../ai/code-review-agent/code-review-agent.service.js';
 import { PromptService } from '../../ai/prompt/prompt.service.js';
+import { IssueCommentCreatedEvent } from '@octokit/webhooks-types';
 
 const IGNORED_FILE_EXTENSIONS = [
   '.svg', '.png', '.jpeg', '.jpg', '.gif', '.bmp', '.ico',
@@ -15,6 +16,7 @@ const IGNORED_FILE_EXTENSIONS = [
 
 @Injectable()
 export class WebhookService {
+    
     private readonly logger = new Logger(WebhookService.name);
 
     constructor(
@@ -22,6 +24,34 @@ export class WebhookService {
         private readonly githubApiService: GithubApiService,
         private readonly promptService: PromptService
     ) {}
+
+    async handleCommentEvent(payload: IssueCommentCreatedEvent) {
+        const { number, title, body } = payload.issue;
+        const { owner, name } = payload.repository;
+        const commentBody = payload.comment.body;
+
+        try {
+            const existingReviewComments = await this.githubApiService.getPullRequestReviewComments(owner.login, name, number);
+            const allDiffs = await this.githubApiService.getPullRequestDiff(owner.login, name, number);
+
+            const conversationalResponse = await this.codeReviewAgentService.respondToComment(
+                owner.login,
+                name,
+                number,
+                title,
+                body,
+                commentBody,
+                allDiffs,
+                existingReviewComments
+            );
+
+            await this.githubApiService.createPullRequestReviewComment(owner.login, name, number, conversationalResponse);
+            this.logger.log(`PR #${number}에 대한 대화형 답변이 성공적으로 게시되었습니다.`);
+
+        } catch(e) {
+            this.logger.error(`PR #${number}의 댓글 처리 중 오류 발생: ${e.message}`);
+        }
+    }
 
     async handlePullRequestEvent(payload: PullRequestEventPayload) {
         const { number, title, body } = payload.pull_request;

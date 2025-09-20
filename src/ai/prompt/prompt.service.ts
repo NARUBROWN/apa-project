@@ -3,6 +3,7 @@ import handlebars from 'handlebars';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
+import { PullRequestReviewComment } from '@octokit/webhooks-types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,6 +99,29 @@ export class PromptService {
 
         const result = template(data);
         this.logger.log(`[createKeywordExtractionPrompt] ${result}`);
+        return result;
+    }
+
+    createConversationalPrompt(prTitle: string, prBody: string | null, userComment: string, allDiffs: string, existingReviewComment: PullRequestReviewComment[]) {
+        const template = this.compiledTemplates.get('conversational-prompt');
+        if (!template) throw new InternalServerErrorException('conversational-prompt 템플릿을 불러오는데 실패했습니다.');
+        
+        const truncatedDiff = allDiffs.length > this.MAX_DIFF_LENGTH
+                                    ? allDiffs.substring(0, this.MAX_DIFF_LENGTH) + '\n... [Diff content truncated]' :
+                                    allDiffs;
+        
+        const existingComments = existingReviewComment.map(c => `AI Reviewer: ${c.body}`).join('\n\n');
+
+        const data = {
+            prTitle,
+            prBody: prBody || '',
+            userComment,
+            truncatedDiff,
+            existingComments,
+        };
+
+        const result = template(data);
+        this.logger.log(`[createConversationalPrompt] 프롬프트 생성 완료`);
         return result;
     }
 
