@@ -131,7 +131,7 @@ export class PromptService {
 
     private loadTemplates() {
         try {
-            const templatesPath = path.join(process.cwd(), 'src', 'ai', 'prompt', 'templates');
+            const templatesPath = path.join(__dirname, 'templates');
             const files = fs.readdirSync(templatesPath);
 
             for (const file of files) {
