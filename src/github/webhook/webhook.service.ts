@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PullRequestEventPayload } from './webhook.github.type.js';
-import { GithubApiService } from '../github-api/github-api.service.js';
+import { PullRequestEventPayload } from './webhook.github.type';
+import { GithubApiService } from '../github-api/github-api.service';
 import path from 'path';
 import parseDiff from 'parse-diff';
-import { CodeReviewAgentService } from '../../ai/code-review-agent/code-review-agent.service.js';
-import { PromptService } from '../../ai/prompt/prompt.service.js';
+import { CodeReviewAgentService } from '../../ai/code-review-agent/code-review-agent.service';
+import { PromptService } from '../../ai/prompt/prompt.service';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types';
 
 const IGNORED_FILE_EXTENSIONS = [

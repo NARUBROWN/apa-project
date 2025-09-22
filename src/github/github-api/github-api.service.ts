@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Octokit } from '@octokit/rest';
-import { isString } from '../../utils/type-guards.js'; 
+import { isString } from '../../utils/type-guards';
 import { ConfigService } from '@nestjs/config';
 import Fuse from 'fuse.js';
 import { PullRequestReviewComment } from '@octokit/webhooks-types';
+import { Octokit } from '@octokit/rest';
 
 @Injectable()
 export class GithubApiService {
     private readonly logger = new Logger(GithubApiService.name);
-    private readonly octokit: Octokit;
+    private octokit: Octokit;
 
     constructor(
         private readonly configService: ConfigService
@@ -142,8 +142,8 @@ export class GithubApiService {
             }
 
             const filePaths = response.data.tree
-                                    .filter(item => item.type === 'blob')
-                                    .map(item => item.path);
+                                    .filter(item => item.type === 'blob' && item.path)
+                                    .map(item => item.path) as string[];
             
             return filePaths;
         } catch(e) {

@@ -1,15 +1,19 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import handlebars from 'handlebars';
-import * as path from 'path';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import * as fs from 'fs';
+import * as path from 'path';
+import * as handlebars from 'handlebars';
 import { fileURLToPath } from 'url';
 import { PullRequestReviewComment } from '@octokit/webhooks-types';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 @Injectable()
 export class PromptService {
+    private getTemplate(templateName: string): HandlebarsTemplateDelegate {
+        const templatePath = path.join(process.cwd(), 'src', 'ai', 'prompt', 'templates', `${templateName}.hbs`);
+        const templateContent = fs.readFileSync(templatePath, 'utf-8');
+        return handlebars.compile(templateContent);
+    }
+
+
     
     private readonly logger = new Logger(PromptService.name);
 
@@ -127,17 +131,17 @@ export class PromptService {
 
     private loadTemplates() {
         try {
-            const templatesPath = path.join(__dirname, 'templates');
-            const file = fs.readdirSync(templatesPath);
+            const templatesPath = path.join(process.cwd(), 'src', 'ai', 'prompt', 'templates');
+            const files = fs.readdirSync(templatesPath);
 
-            file.forEach(file => {
-                if (file.endsWith('hbs')) {
+            for (const file of files) {
+                if (file.endsWith('.hbs')) {
                     const filePath = path.join(templatesPath, file);
-                    const templatesName = path.parse(file).name;
+                    const templateName = path.parse(file).name;
                     const source = fs.readFileSync(filePath, 'utf-8');
-                    this.compiledTemplates.set(templatesName, handlebars.compile(source));
+                    this.compiledTemplates.set(templateName, handlebars.compile(source));
                 }
-            });
+            }
         } catch (e) {
             this.logger.error('템플릿을 불러오는데 실패했습니다. ', e.message);
             throw e;

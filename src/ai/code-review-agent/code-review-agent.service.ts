@@ -1,8 +1,8 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { PromptService } from '../prompt/prompt.service.js';
-import { GithubApiService } from '../../github/github-api/github-api.service.js';
-import { AIService } from '../interfaces/ai-service.interface.js';
-import { AI_SERVICE } from '../interfaces/ai-service.token.js';
+import { PromptService } from '../prompt/prompt.service';
+import { GithubApiService } from '../../github/github-api/github-api.service';
+import { AIService } from '../interfaces/ai-service.interface';
+import { AI_SERVICE } from '../interfaces/ai-service.token';
 import { components } from '@octokit/openapi-types';
 import { PullRequestReviewComment } from '@octokit/webhooks-types';
 
