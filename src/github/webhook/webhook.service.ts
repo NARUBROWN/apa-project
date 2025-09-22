@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PullRequestEventPayload } from './webhook.github.type';
 import { GithubApiService } from '../github-api/github-api.service';
 import path from 'path';
-import parseDiff from 'parse-diff';
 import { CodeReviewAgentService } from '../../ai/code-review-agent/code-review-agent.service';
 import { PromptService } from '../../ai/prompt/prompt.service';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types';
@@ -66,7 +65,7 @@ export class WebhookService {
             for (const commitSha of commits) {
                 const diff = await this.githubApiService.getCommitDiff(owner.login, name, commitSha);
                 const filteredDiffText = this.filterDiff(diff, IGNORED_FILE_EXTENSIONS);
-                filteredAllDiffs += filteredDiffText + '\n';
+                filteredAllDiffs += filteredDiffText;
             }
 
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
@@ -100,26 +99,24 @@ export class WebhookService {
     }
 
     private filterDiff(diff: string, ignoredExtensions: string[]): string {
-        const files = parseDiff(diff);
-        const filteredDiffs: string[] = [];
-
-        for (const file of files) {
-            if (typeof file.to !== 'string') {
-                continue;
-            }
-
-            const extension = path.extname(file.to).toLocaleLowerCase();
-
-            if (!ignoredExtensions.includes(extension)) {
-                const header = `diff --git a/${file.from} b/${file.to}\n`;
-                const chunks = file.chunks.map(chunk => {
-                    const chunkHeader = `@@ -${chunk.oldStart},${chunk.oldLines} +${chunk.newStart},${chunk.newLines} @@\n`;
-                    const changes = chunk.changes.map(change => `${change.content}`).join('\n');
-                    return chunkHeader + changes;
-                }).join('\n');
-                filteredDiffs.push(header + chunks);
-            }
+        if (!diff) {
+            return '';
         }
-        return filteredDiffs.join('\n');
+
+        const diffs = diff.split(/(?=diff --git)/g).filter(s => s.trim().length > 0);
+    
+        const filteredDiffs = diffs.filter(d => {
+            const firstLine = d.split('\n')[0];
+        
+            const match = firstLine.match(/ b\/(.+)$/);
+            if (match && match[1]) {
+                const fileName = match[1].trim().split(' ')[0];
+                const extension = path.extname(fileName).toLocaleLowerCase();
+                return !ignoredExtensions.includes(extension);
+            }
+            return false; 
+        });
+    
+        return filteredDiffs.join('');
     }
 }
