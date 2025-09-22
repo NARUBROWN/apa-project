@@ -1,6 +1,6 @@
 import { Controller, Post, Headers, Body, UnauthorizedException } from '@nestjs/common';
 import { createHmac } from 'crypto';
-import { WebhookService } from './webhook.service.js';
+import { WebhookService } from './webhook.service';
 import { PullRequestEventPayload, WebhookPayload } from './webhook.github.type';
 import { ConfigService } from '@nestjs/config';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types';
