@@ -71,7 +71,7 @@ export class WebhookService {
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
             
             const filteredAllChangedFiles = allChangedFiles.filter(file => {
-                const extension = path.extname(file).toLocaleLowerCase();
+                const extension = path.extname(file.filename).toLocaleLowerCase();
                 return !IGNORED_FILE_EXTENSIONS.includes(extension);
             });
 
