@@ -71,9 +71,7 @@ export class WebhookService {
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
             
             const filteredAllChangedFiles = allChangedFiles.filter(file => {
-                this.logger.log(`[DEBUG] Checking file: ${JSON.stringify(file)}`);
                 if (!file || !file.filename) {
-                    this.logger.log(`[DEBUG] Skipping invalid file object: ${JSON.stringify(file)}`);
                     return false;
                 }
                 const extension = path.extname(file.filename).toLocaleLowerCase();
@@ -116,7 +114,6 @@ export class WebhookService {
             const match = firstLine.match(/ b\/(.+)$/);
             if (match && match[1]) {
                 const fileName = match[1].trim().split(' ')[0];
-                this.logger.log(`[DEBUG] Checking diff fileName: ${fileName}`);
                 if (!fileName) {
                     return false;
                 }
