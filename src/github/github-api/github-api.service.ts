@@ -176,7 +176,7 @@ export class GithubApiService {
         }
     }
 
-    async getPullRequestFiles(owner: string, repo: string, pull_number: number): Promise<string[]> {
+    async getPullRequestFiles(owner: string, repo: string, pull_number: number): Promise<any[]> {
         try {
             const { data: files } = await this.octokit.rest.pulls.listFiles({
                 owner,
@@ -184,7 +184,7 @@ export class GithubApiService {
                 pull_number
             });
 
-            return files.map(file => file.filename);
+            return files;
         } catch(e) {
             this.logger.error(`PR #${pull_number}의 파일 목록을 가져오는 중 오류 발생: ${e.message}`);
             throw e; 
