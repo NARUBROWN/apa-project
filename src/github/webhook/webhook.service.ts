@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PullRequestEventPayload } from './webhook.github.type';
 import { GithubApiService } from '../github-api/github-api.service';
-import path from 'path';
+import * as path from 'path';
 import { CodeReviewAgentService } from '../../ai/code-review-agent/code-review-agent.service';
 import { PromptService } from '../../ai/prompt/prompt.service';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types';
@@ -117,6 +117,7 @@ export class WebhookService {
                 if (!fileName) {
                     return false;
                 }
+                console.log(path.extname('test/test.test'));
                 const extension = path.extname(fileName).toLocaleLowerCase();
                 return !ignoredExtensions.includes(extension);
             }
