@@ -71,6 +71,9 @@ export class WebhookService {
             const allChangedFiles = await this.githubApiService.getPullRequestFiles(owner.login, name, number);
             
             const filteredAllChangedFiles = allChangedFiles.filter(file => {
+                if (!file || !file.filename) {
+                    return false;
+                }
                 const extension = path.extname(file.filename).toLocaleLowerCase();
                 return !IGNORED_FILE_EXTENSIONS.includes(extension);
             });
@@ -111,6 +114,9 @@ export class WebhookService {
             const match = firstLine.match(/ b\/(.+)$/);
             if (match && match[1]) {
                 const fileName = match[1].trim().split(' ')[0];
+                if (!fileName) {
+                    return false;
+                }
                 const extension = path.extname(fileName).toLocaleLowerCase();
                 return !ignoredExtensions.includes(extension);
             }

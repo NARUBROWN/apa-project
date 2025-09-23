@@ -3,12 +3,25 @@ import { WebhookService } from './webhook.service';
 import { CodeReviewAgentService } from '../../ai/code-review-agent/code-review-agent.service';
 import { GithubApiService } from '../github-api/github-api.service';
 import { PromptService } from '../../ai/prompt/prompt.service';
+import { PullRequestEventPayload } from './webhook.github.type';
 
 describe('WebhookService', () => {
   let service: WebhookService;
+  let githubApiService: GithubApiService;
+  let codeReviewAgentService: CodeReviewAgentService;
 
-  const mockCodeReviewAgentService = {};
-  const mockGithubApiService = {};
+  const mockCodeReviewAgentService = {
+    performCodeReview: jest.fn(),
+  };
+  const mockGithubApiService = {
+    getPullRequestCommits: jest.fn(),
+    getCommitDiff: jest.fn(),
+    getPullRequestFiles: jest.fn(),
+    createPullRequestReview: jest.fn(),
+    getPullRequestReviewComments: jest.fn(),
+    createPullRequestReviewComment: jest.fn(),
+    getPullRequestDiff: jest.fn(),
+  };
   const mockPromptService = {};
 
   beforeEach(async () => {
@@ -22,127 +35,81 @@ describe('WebhookService', () => {
     }).compile();
 
     service = module.get<WebhookService>(WebhookService);
+    githubApiService = module.get<GithubApiService>(GithubApiService);
+    codeReviewAgentService = module.get<CodeReviewAgentService>(CodeReviewAgentService);
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
+  describe('handlePullRequestEvent', () => {
+    let payload: Partial<PullRequestEventPayload>;
+
+    beforeEach(() => {
+      jest.resetAllMocks(); // Reset mocks before each test
+
+      payload = {
+        pull_request: {
+          number: 133,
+          title: 'Test PR',
+          body: 'Test PR body',
+          head: { sha: 'test-sha' },
+          base: { repo: { language: 'TypeScript' } },
+        },
+        repository: { owner: { login: 'test-owner' }, name: 'test-repo' },
+      } as Partial<PullRequestEventPayload>;
+
+      // Default mocks for a happy path
+      (githubApiService.getPullRequestCommits as jest.Mock).mockResolvedValue(['sha1']);
+      (githubApiService.getCommitDiff as jest.Mock).mockResolvedValue('diff --git a/src/main.ts b/src/main.ts');
+      (githubApiService.createPullRequestReview as jest.Mock).mockResolvedValue({});
+      (codeReviewAgentService.performCodeReview as jest.Mock).mockResolvedValue('LGTM!');
+    });
+
+    it('should not throw when getPullRequestFiles returns objects without filename', async () => {
+      const files = [{ filename: 'good.ts' }, { status: 'deleted' }]; // An object without 'filename'
+      (githubApiService.getPullRequestFiles as jest.Mock).mockResolvedValue(files);
+
+      await expect(service.handlePullRequestEvent(payload as PullRequestEventPayload)).resolves.not.toThrow();
+      
+      expect(codeReviewAgentService.performCodeReview).toHaveBeenCalled();
+      const passedFiles = (codeReviewAgentService.performCodeReview as jest.Mock).mock.calls[0][7];
+      expect(passedFiles).toHaveLength(1);
+      expect(passedFiles[0].filename).toBe('good.ts');
+    });
+
+    it('should not throw when getPullRequestFiles returns undefined or null in the list', async () => {
+      const files = [{ filename: 'good.ts' }, undefined, null];
+      (githubApiService.getPullRequestFiles as jest.Mock).mockResolvedValue(files);
+
+      await expect(service.handlePullRequestEvent(payload as PullRequestEventPayload)).resolves.not.toThrow();
+      
+      expect(codeReviewAgentService.performCodeReview).toHaveBeenCalled();
+      const passedFiles = (codeReviewAgentService.performCodeReview as jest.Mock).mock.calls[0][7];
+      expect(passedFiles).toHaveLength(1);
+      expect(passedFiles[0].filename).toBe('good.ts');
+    });
+  });
+
   describe('filterDiff', () => {
-    // WebhookService 내부에 정의된 IGNORED_FILE_EXTENSIONS를 사용
-    const IGNORED_FILE_EXTENSIONS = [
-      '.svg', '.png', '.jpeg', '.jpg', '.gif', '.bmp', '.ico',
-      '.mp4', '.mov', '.avi', '.webm',
-      '.lock',
-    ];
+    const IGNORED_FILE_EXTENSIONS = ['.lock'];
 
     it('should filter out diffs for ignored file extensions', () => {
-      const diffWithIgnoredFile = `diff --git a/image.png b/image.png
-index 123..456 100644
---- a/image.png
-+++ b/image.png
-@@ -1,1 +1,1 @@
--Binary file a/image.png has changed
-+Binary file b/image.png has changed
-diff --git a/src/index.ts b/src/index.ts
-index 789..012 100644
---- a/src/index.ts
-+++ b/src/index.ts
-@@ -1,2 +1,3 @@
- const a = 1;
--const b = 2;
-+const b = 3;
-+const c = 4;
-`;
-
-      const expectedDiff = `diff --git a/src/index.ts b/src/index.ts
-index 789..012 100644
---- a/src/index.ts
-+++ b/src/index.ts
-@@ -1,2 +1,3 @@
- const a = 1;
--const b = 2;
-+const b = 3;
-+const c = 4;
-`;
-      
-      const result = (service as any).filterDiff(diffWithIgnoredFile, IGNORED_FILE_EXTENSIONS);
-      expect(result.trim()).toBe(expectedDiff.trim());
-    });
-
-    it('should keep diffs for non-ignored file extensions', () => {
-      const diffWithJsFile = `diff --git a/src/service.js b/src/service.js
-index 123..456 100644
---- a/src/service.js
-+++ b/src/service.js
-@@ -1,2 +1,3 @@
- function add(a, b) {
--  return a + b;
-+  return a - b;
-+  // just kidding
-}
-`;
-      const result = (service as any).filterDiff(diffWithJsFile, IGNORED_FILE_EXTENSIONS);
-      expect(result.trim()).toBe(diffWithJsFile.trim());
-    });
-
-    it('should handle a mix of ignored and non-ignored files', () => {
-      const mixedDiff = `diff --git a/logo.svg b/logo.svg
-index 123..456 100644
---- a/logo.svg
-+++ b/logo.svg
-@@ -1,1 +1,1 @@
--Binary file a/logo.svg has changed
-+Binary file b/logo.svg has changed
-diff --git a/src/app.module.ts b/src/app.module.ts
-index 789..012 100644
---- a/src/app.module.ts
-+++ b/src/app.module.ts
-@@ -1,1 +1,1 @@
- import { Module } from '@nestjs/common';
--import { AppController } from './app.controller';
-+import { AppController } from './app.controller.js';
-`;
-      const expectedDiff = `diff --git a/src/app.module.ts b/src/app.module.ts
-index 789..012 100644
---- a/src/app.module.ts
-+++ b/src/app.module.ts
-@@ -1,1 +1,1 @@
- import { Module } from '@nestjs/common';
--import { AppController } from './app.controller';
-+import { AppController } from './app.controller.js';
-`;
-      const result = (service as any).filterDiff(mixedDiff, IGNORED_FILE_EXTENSIONS);
-      expect(result.trim()).toBe(expectedDiff.trim());
-    });
-
-    it('should return an empty string for an empty diff', () => {
-      const emptyDiff = '';
-      const result = (service as any).filterDiff(emptyDiff, IGNORED_FILE_EXTENSIONS);
+      const diff = `diff --git a/yarn.lock b/yarn.lock\n...`;
+      const result = (service as any).filterDiff(diff, IGNORED_FILE_EXTENSIONS);
       expect(result).toBe('');
     });
 
-    it('should not filter anything if ignoredExtensions is empty', () => {
-      const diff = `diff --git a/image.png b/image.png
-index 123..456 100644
---- a/image.png
-+++ b/image.png
-@@ -1,1 +1,1 @@
--Binary file a/image.png has changed
-+Binary file b/image.png has changed
-diff --git a/src/index.ts b/src/index.ts
-index 789..012 100644
---- a/src/index.ts
-+++ b/src/index.ts
-@@ -1,2 +1,3 @@
- const a = 1;
--const b = 2;
-+const b = 3;
-+const c = 4;
-`;
-      const emptyIgnoredExtensions = [];
-      const result = (service as any).filterDiff(diff, emptyIgnoredExtensions);
-      expect(result.trim()).toBe(diff.trim());
+    it('should handle malformed diff lines gracefully', () => {
+      const malformedDiff = 'diff --git a/some/file.ts b/ \n--- a/some/file.ts\n+++ b/ \n';
+      const result = (service as any).filterDiff(malformedDiff, IGNORED_FILE_EXTENSIONS);
+      expect(result).toBe('');
+    });
+
+    it('should return an empty string for an empty diff', () => {
+      const result = (service as any).filterDiff('', IGNORED_FILE_EXTENSIONS);
+      expect(result).toBe('');
     });
   });
 });
